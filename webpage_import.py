@@ -9,22 +9,48 @@ def safe_get(func, default=None):
         return default
 
 
+def empty_recipe_with_error(message):
+    return {
+        "name": None, "servings": None,
+        "prep_time_minutes": None, "cook_time_minutes": None,
+        "ingredients": [], "steps": [], "image": None,
+        "error": message
+    }
+
+
 def fetch_recipe_from_url(url):
     try:
         scraper = scrape_me(url)
     except Exception as e:
-        print(f"Could not read this page as a recipe: {e}")
-        return None
+        error_text = str(e)
+        if "403" in error_text or "Forbidden" in error_text:
+            return empty_recipe_with_error(
+                "This website blocked automated access. Try pasting the recipe text instead."
+            )
+        elif "timeout" in error_text.lower():
+            return empty_recipe_with_error(
+                "The website took too long to respond. Please try again later."
+            )
+        else:
+            return empty_recipe_with_error(f"Could not read this page: {error_text}")
 
     raw_ingredients = safe_get(scraper.ingredients, default=[])
     raw_steps = safe_get(scraper.instructions_list, default=[])
 
-    # Join the raw scraped text into one block, then let extract_recipe
-    # split it properly into quantity/unit/name/note and clean steps
+    if not raw_ingredients and not raw_steps:
+        return empty_recipe_with_error(
+            "No recipe content could be found on this page."
+        )
+
+    if raw_ingredients and not raw_steps:
+        return empty_recipe_with_error(
+            "This looks like a recipe listing or collection page, not a single recipe. "
+            "Please use the link to one specific recipe."
+        )
+
     combined_text = "Ingredients:\n" + "\n".join(raw_ingredients) + "\n\nSteps:\n" + "\n".join(raw_steps)
     structured = extract_recipe(combined_text)
 
-    # Fill in the fields the scraper already gave us directly (no AI needed for these)
     structured["name"] = safe_get(scraper.title) or structured.get("name")
     structured["servings"] = safe_get(scraper.yields) or structured.get("servings")
     structured["cook_time_minutes"] = safe_get(scraper.total_time) or structured.get("cook_time_minutes")
@@ -34,12 +60,20 @@ def fetch_recipe_from_url(url):
 
 
 if __name__ == "__main__":
-    test_url = "https://www.bbcgoodfood.com/recipes/easy-pancakes"
-    recipe_data = fetch_recipe_from_url(test_url)
+    test_urls = [
+        "https://www.bbcgoodfood.com/recipes/easy-pancakes",              # known-good
+        "https://www.allrecipes.com/recipe/158968/spinach-and-feta-turkey-burgers/",  # blocks bots (403)
+        "https://pinchofyum.com/the-best-soft-chocolate-chip-cookies",     # personal blog, messier
+        "https://www.bbcgoodfood.com/recipes/collection/pancake-recipes", # multiple recipes, no single recipe
+    ]
 
-    if recipe_data:
-        print("FINAL STRUCTURED RECIPE:")
-        for key, value in recipe_data.items():
-            print(f"{key}: {value}")
-    else:
-        print("No recipe data found on this page.")
+    for url in test_urls:
+        print(f"\n--- {url} ---")
+        result = fetch_recipe_from_url(url)
+        if result.get("error"):
+            print(f"ERROR: {result['error']}")
+        else:
+            print(f"name: {result['name']}")
+            print(f"servings: {result['servings']}")
+            print(f"ingredients: {result['ingredients']}")
+            print(f"steps: {result['steps']}")
