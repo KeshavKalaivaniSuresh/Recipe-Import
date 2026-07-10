@@ -73,7 +73,7 @@ def fetch_recipe_from_youtube(url):
 
 
 if __name__ == "__main__":
-    test_url = "https://www.youtube.com/watch?v=s8t3uaIu3XA"
+    test_url = "https://www.youtube.com/watch?v=tY9pSkn1VCg"
     result = fetch_recipe_from_youtube(test_url)
 
     if result.get("error"):

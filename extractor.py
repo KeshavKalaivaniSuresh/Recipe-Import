@@ -24,6 +24,9 @@ even short ones like "done" or "serve". Do not skip, merge, or summarize steps.
 Exclude any conversational filler, small talk, greetings, comments to viewers,
 or asides unrelated to actually preparing the dish (e.g. "let me know in the comments",
 talking to people in the room, thanking viewers). Only include genuine cooking instructions.
+Cross-check the ingredients list against the steps: if a step mentions using something
+(e.g. an ingredient, sauce, or seasoning) that isn't already in the ingredients list, add it
+to the ingredients list too, using null for quantity/unit if not stated.
 If a time is only vaguely implied (not stated as a number), use null rather than guessing.
 If something is not mentioned, use null. Do not invent anything.
 If the text is not a recipe at all (no ingredients or cooking instructions),
