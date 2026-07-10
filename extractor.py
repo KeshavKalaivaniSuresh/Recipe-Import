@@ -21,6 +21,9 @@ ingredients (list of objects with quantity, unit, name, note),
 steps (list of strings).
 Include every instruction from the source as a separate step, in the same order,
 even short ones like "done" or "serve". Do not skip, merge, or summarize steps.
+Exclude any conversational filler, small talk, greetings, comments to viewers,
+or asides unrelated to actually preparing the dish (e.g. "let me know in the comments",
+talking to people in the room, thanking viewers). Only include genuine cooking instructions.
 If a time is only vaguely implied (not stated as a number), use null rather than guessing.
 If something is not mentioned, use null. Do not invent anything.
 If the text is not a recipe at all (no ingredients or cooking instructions),
