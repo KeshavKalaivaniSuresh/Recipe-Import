@@ -25,13 +25,24 @@ def get_title_and_description(url):
 
 
 def get_transcript(video_id):
+    """Try to fetch an English transcript. Falls back to translating a foreign one if needed."""
     try:
         ytt_api = YouTubeTranscriptApi()
-        transcript_list = ytt_api.fetch(video_id)
-        full_text = " ".join(entry.text for entry in transcript_list)
+        transcript_list = ytt_api.list(video_id)
+
+        try:
+            transcript = transcript_list.find_transcript(["en", "en-IN", "en-US", "en-GB"])
+        except Exception:
+            transcript = next(iter(transcript_list))
+            if transcript.is_translatable and not transcript.language_code.startswith("en"):
+                transcript = transcript.translate("en")
+
+        fetched = transcript.fetch()
+        full_text = " ".join(entry.text for entry in fetched)
         return full_text
+
     except Exception:
-        return ""  # silently return empty — no need to print the library's internal error
+        return ""
 
 
 def fetch_recipe_from_youtube(url):
@@ -62,7 +73,6 @@ def fetch_recipe_from_youtube(url):
     combined_text = f"Title: {title}\n\nDescription:\n{description}\n\nTranscript:\n{transcript}"
     structured = extract_recipe(combined_text)
 
-        # Let the user know if steps couldn't be found due to missing captions
     if not structured.get("steps") and not transcript:
         structured["note"] = (
             "No captions were available for this video, and the description didn't include "
@@ -73,7 +83,7 @@ def fetch_recipe_from_youtube(url):
 
 
 if __name__ == "__main__":
-    test_url = "https://www.youtube.com/watch?v=tY9pSkn1VCg"
+    test_url = "https://www.youtube.com/watch?v=X4H3WJRsz7o"
     result = fetch_recipe_from_youtube(test_url)
 
     if result.get("error"):
