@@ -25,15 +25,13 @@ def get_title_and_description(url):
 
 
 def get_transcript(video_id):
-    """Try to fetch captions/transcript text. Returns empty string if unavailable."""
     try:
         ytt_api = YouTubeTranscriptApi()
         transcript_list = ytt_api.fetch(video_id)
         full_text = " ".join(entry.text for entry in transcript_list)
         return full_text
-    except Exception as e:
-        print(f"No transcript available: {e}")
-        return ""
+    except Exception:
+        return ""  # silently return empty — no need to print the library's internal error
 
 
 def fetch_recipe_from_youtube(url):
@@ -63,11 +61,19 @@ def fetch_recipe_from_youtube(url):
 
     combined_text = f"Title: {title}\n\nDescription:\n{description}\n\nTranscript:\n{transcript}"
     structured = extract_recipe(combined_text)
+
+        # Let the user know if steps couldn't be found due to missing captions
+    if not structured.get("steps") and not transcript:
+        structured["note"] = (
+            "No captions were available for this video, and the description didn't include "
+            "step-by-step instructions. You may need to add the method manually."
+        )
+
     return structured
 
 
 if __name__ == "__main__":
-    test_url = "https://www.youtube.com/watch?v=XxlitHO0v18"
+    test_url = "https://www.youtube.com/watch?v=s8t3uaIu3XA"
     result = fetch_recipe_from_youtube(test_url)
 
     if result.get("error"):
@@ -77,3 +83,5 @@ if __name__ == "__main__":
         print(f"servings: {result['servings']}")
         print(f"ingredients: {result['ingredients']}")
         print(f"steps: {result['steps']}")
+        if result.get("note"):
+            print(f"NOTE: {result['note']}")
