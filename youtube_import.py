@@ -72,6 +72,7 @@ def fetch_recipe_from_youtube(url):
 
     combined_text = f"Title: {title}\n\nDescription:\n{description}\n\nTranscript:\n{transcript}"
     structured = extract_recipe(combined_text)
+    structured["name"] = structured.get("name") or title or None
 
     if not structured.get("steps") and not transcript:
         structured["note"] = (
@@ -83,15 +84,18 @@ def fetch_recipe_from_youtube(url):
 
 
 if __name__ == "__main__":
-    test_url = "https://www.youtube.com/watch?v=X4H3WJRsz7o"
-    result = fetch_recipe_from_youtube(test_url)
+    test_urls = [
+        "https://www.youtube.com/watch?v=GdxdfME7VY4",
+    ]
 
-    if result.get("error"):
-        print(f"ERROR: {result['error']}")
-    else:
-        print(f"name: {result['name']}")
-        print(f"servings: {result['servings']}")
-        print(f"ingredients: {result['ingredients']}")
-        print(f"steps: {result['steps']}")
-        if result.get("note"):
-            print(f"NOTE: {result['note']}")
+    for url in test_urls:
+        print(f"\n--- {url} ---")
+        result = fetch_recipe_from_youtube(url)
+        if result.get("error"):
+            print(f"ERROR: {result['error']}")
+        else:
+            print(f"name: {result['name']}")
+            print(f"ingredients: {result['ingredients']}")
+            print(f"steps: {result['steps']}")
+            if result.get("note"):
+                print(f"NOTE: {result['note']}")
