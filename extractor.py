@@ -26,6 +26,14 @@ def extract_recipe(messy_text):
 name, servings, prep_time_minutes, cook_time_minutes,
 ingredients (list of objects with quantity, unit, name, note),
 steps (list of strings).
+
+IMPORTANT: If the source text is written in a language other than English, you MUST translate
+the recipe name, ingredient names, notes, and steps into English in your JSON output.
+Do not leave any field in the original non-English script. However, keep well-known
+regional ingredient or dish names in their commonly used English form (e.g. "jeera",
+"paneer", "dal") rather than a literal translation, if that is how they are normally
+referred to in English.
+
 Include every instruction from the source as a separate step, in the same order,
 even short ones like "done" or "serve". Do not skip, merge, or summarize steps.
 Exclude any conversational filler, small talk, greetings, comments to viewers,
@@ -36,8 +44,6 @@ Cross-check the ingredients list against the steps: if a step mentions using som
 to the ingredients list too, using null for quantity/unit if not stated.
 If the same ingredient is mentioned more than once, merge it into a single entry instead of
 listing it twice, combining quantities if possible.
-If the source text is not in English, translate the extracted name, notes, and steps into English,
-but keep well-known regional ingredient or dish names in their original form (e.g. "jeera", "paneer").
 If a time is only vaguely implied (not stated as a number), use null rather than guessing.
 If something is not mentioned, use null. Do not invent anything.
 If the text is not a recipe at all (no ingredients or cooking instructions),
@@ -101,7 +107,13 @@ if __name__ == "__main__":
         """
         just wanted to say the weather is really nice today, hope you're doing well.
         """,
-        ""
+        "",
+        """
+        आलू पराठा - 4 लोगों के लिए
+        2 कप आटा, 3 उबले आलू, नमक, लाल मिर्च, थोड़ा घी चाहिए
+        सब कुछ मिलाएं, आटा गूंथें, आलू भरें, बेलें और तवे पर सुनहरा होने तक तलें
+        """,
+        "chop onions. " * 5000,
     ]
 
     for i, text in enumerate(test_cases, start=1):
