@@ -5,6 +5,8 @@ from groq import Groq
 
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
+MAX_CHARS = 12000  # safety limit to avoid exceeding the model's input size
+
 
 def extract_recipe(messy_text):
     if not messy_text or not messy_text.strip():
@@ -14,6 +16,11 @@ def extract_recipe(messy_text):
             "ingredients": [], "steps": [],
             "error": "No text provided"
         }
+
+    truncated = False
+    if len(messy_text) > MAX_CHARS:
+        messy_text = messy_text[:MAX_CHARS]
+        truncated = True
 
     prompt = f"""Extract this recipe into JSON with these exact keys:
 name, servings, prep_time_minutes, cook_time_minutes,
@@ -27,6 +34,10 @@ talking to people in the room, thanking viewers). Only include genuine cooking i
 Cross-check the ingredients list against the steps: if a step mentions using something
 (e.g. an ingredient, sauce, or seasoning) that isn't already in the ingredients list, add it
 to the ingredients list too, using null for quantity/unit if not stated.
+If the same ingredient is mentioned more than once, merge it into a single entry instead of
+listing it twice, combining quantities if possible.
+If the source text is not in English, translate the extracted name, notes, and steps into English,
+but keep well-known regional ingredient or dish names in their original form (e.g. "jeera", "paneer").
 If a time is only vaguely implied (not stated as a number), use null rather than guessing.
 If something is not mentioned, use null. Do not invent anything.
 If the text is not a recipe at all (no ingredients or cooking instructions),
@@ -48,6 +59,14 @@ Recipe text:
             raw_text = raw_text.replace("json", "", 1).strip()
 
         recipe_dict = json.loads(raw_text)
+
+        if truncated:
+            existing_note = recipe_dict.get("note", "") or ""
+            recipe_dict["note"] = (
+                existing_note + " Source text was very long and had to be shortened; "
+                "some details near the end may be missing."
+            ).strip()
+
         return recipe_dict
 
     except Exception as e:
@@ -89,4 +108,4 @@ if __name__ == "__main__":
         print(f"\n--- TEST CASE {i} ---")
         result = extract_recipe(text)
         print(result)
-        time.sleep(2)  
+        time.sleep(2)
