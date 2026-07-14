@@ -34,6 +34,17 @@ regional ingredient or dish names in their commonly used English form (e.g. "jee
 "paneer", "dal") rather than a literal translation, if that is how they are normally
 referred to in English.
 
+If a quantity contains clearly garbled, nonsensical, or mixed-up characters (such as random
+letters mixed with numbers or symbols, which can happen when text was poorly read from a
+scanned image), do NOT guess a plausible-looking number — instead, set quantity to null and
+add a short note like "quantity unclear in source". However, standard fraction symbols (½, ⅓,
+¼, ⅔, ¾, etc.) are always valid and should be confidently converted to their decimal or
+fractional value — do not treat these as unclear.
+
+If there are no method/steps in the source at all, return an empty list for steps.
+Do NOT invent a placeholder sentence such as "no steps provided" — an empty list is correct
+and expected in this situation.
+
 Include every instruction from the source as a separate step, in the same order,
 even short ones like "done" or "serve". Do not skip, merge, or summarize steps.
 Exclude any conversational filler, small talk, greetings, comments to viewers,
@@ -49,6 +60,7 @@ If something is not mentioned, use null. Do not invent anything.
 If the text is not a recipe at all (no ingredients or cooking instructions),
 return every field as null or an empty list — do not treat unrelated sentences as steps.
 Reply with ONLY the JSON, nothing else, no markdown formatting.
+
 
 Recipe text:
 {messy_text}"""
