@@ -57,6 +57,9 @@ Cross-check the ingredients list against the steps: if a step mentions using som
 to the ingredients list too, using null for quantity/unit if not stated.
 If the same ingredient is mentioned more than once, merge it into a single entry instead of
 listing it twice, combining quantities if possible.
+If the same instruction (such as a bake time/temperature) appears more than once in the source,
+in slightly different wording or as a fragment, include it only once as a clear, complete step —
+do not list it multiple times.
 If a time is only vaguely implied (not stated as a number), use null rather than guessing.
 If something is not mentioned, use null. Do not invent anything.
 If the text is not a recipe at all (no ingredients or cooking instructions),

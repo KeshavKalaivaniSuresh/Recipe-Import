@@ -41,6 +41,8 @@ reply with ONLY the final transcribed text, nothing else."""
                 ]
             }],
             max_tokens=4096,
+            reasoning_effort="none",
+            reasoning_format="hidden",
         )
         raw_output = response.choices[0].message.content
 
@@ -129,7 +131,7 @@ def fetch_recipe_from_file(file_path):
 
 
 if __name__ == "__main__":
-    test_file = "test_handwritten.png"
+    test_file = "blurry_handwritten_test.png"
     result = fetch_recipe_from_file(test_file)
 
     if result.get("error"):
