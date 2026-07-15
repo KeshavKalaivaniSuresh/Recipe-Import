@@ -40,6 +40,8 @@ scanned image), do NOT guess a plausible-looking number — instead, set quantit
 add a short note like "quantity unclear in source". However, standard fraction symbols (½, ⅓,
 ¼, ⅔, ¾, etc.) are always valid and should be confidently converted to their decimal or
 fractional value — do not treat these as unclear.
+If a quantity is written as a range (e.g. "4-5", "3-4", "1-2"), preserve the full range exactly
+as written in the quantity field (e.g. "4-5") — do not collapse it to just one of the numbers.
 
 If there are no method/steps in the source at all, return an empty list for steps.
 Do NOT invent a placeholder sentence such as "no steps provided" — an empty list is correct
@@ -67,7 +69,7 @@ Recipe text:
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = response.choices[0].message.content.strip()

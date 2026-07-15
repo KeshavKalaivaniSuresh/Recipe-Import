@@ -24,9 +24,10 @@ def extract_recipe_from_image_vision(image_path):
 
         prompt = """Look at this image of a recipe and extract all the visible text related to
 the recipe: the dish name, servings, prep/cook time, every ingredient with its exact quantity
-(pay close attention to fraction symbols like ½, ⅓, ¼ — read them precisely), and every
-cooking step, in order. Transcribe only what is visibly written in the image, do not add
-anything that is not there. Reply with the transcribed text only, no extra commentary."""
+(pay close attention to fraction symbols like ½, ⅓, ¼ and ranges like 4-5 — read them precisely),
+and every cooking step, in order. Transcribe only what is visibly written in the image, do not
+add anything that is not there. Do not explain your reasoning or show your thought process —
+reply with ONLY the final transcribed text, nothing else."""
 
         response = vision_client.chat.completions.create(
             model="qwen/qwen3.6-27b",
@@ -39,12 +40,18 @@ anything that is not there. Reply with the transcribed text only, no extra comme
                     }}
                 ]
             }],
+            max_tokens=4096,
         )
         raw_output = response.choices[0].message.content
 
         # Strip any internal reasoning block the model may include
-        if "<think>" in raw_output and "</think>" in raw_output:
-            raw_output = raw_output.split("</think>")[-1].strip()
+        if "<think>" in raw_output:
+            if "</think>" in raw_output:
+                raw_output = raw_output.split("</think>")[-1].strip()
+            else:
+                # Response was cut off mid-reasoning before finishing — not safe to use
+                print("Vision response was cut off before completing.")
+                return None
 
         return raw_output
 
@@ -122,7 +129,7 @@ def fetch_recipe_from_file(file_path):
 
 
 if __name__ == "__main__":
-    test_file = "image_test.png"
+    test_file = "test_handwritten.png"
     result = fetch_recipe_from_file(test_file)
 
     if result.get("error"):
