@@ -612,3 +612,41 @@ Build formal evaluation set (5–10 sample imports across all sources, saved) + 
 1–2 page write-up: approach, key decisions, what worked, what to improve
 Record 5–10 min demo walkthrough
 Final README polish once form is wired in
+
+## Update — Extended Image Testing Round (all 12 test types completed)
+
+After the initial vision-model architecture fix, a full round of image edge-case testing was carried out against real and AI-generated test images, covering every type identified as worth testing. Two real bugs were found and fixed; several accuracy limitations were found and documented rather than chased further.
+
+### Bugs found and fixed during this round
+
+1. **False-precision invention** — the model was replacing vague source wording (e.g. "a small border") with an invented specific measurement (e.g. "3/4 inch border"). Fixed by adding an explicit instruction in `extractor.py` to preserve vague wording rather than invent numbers. Confirmed fixed on re-test.
+2. **Crash on multi-recipe images** — an image containing two complete, separate recipes caused the model to return a JSON *list* of recipes instead of a single object, crashing `fetch_recipe_from_file` (`'list' object has no attribute 'get'`). Fixed with (a) an explicit "only extract the first recipe, always return a single object" prompt instruction, and (b) a defensive `isinstance(recipe_dict, list)` check in `extractor.py` that returns a clear error instead of crashing, even if the model ignores the instruction. Confirmed fixed on re-test — correctly extracted only the first recipe.
+
+### Test results by type
+
+| Type | Result |
+|---|---|
+| Clean printed recipe | Fully accurate |
+| Handwritten (clear, real photo) | Fully accurate |
+| Handwritten (messy, real photo, with page bleed-through) | Accurate; one technique-changing word misread ("Break" → "Separate") |
+| Illegible/very blurry image | Correctly rejected via blur detection, no crash |
+| Angled photo (AI-generated handwriting) | Fully accurate — confirms angle/perspective alone doesn't break extraction |
+| Angled photo (real handwriting, good framing) | Fully accurate — combines real handwriting + angle successfully |
+| Angled photo (real handwriting, poor framing/very small text) | Correctly rejected as unclear — validated against an image that was borderline for human readability too |
+| Multi-column layout | Reading order stayed correct, no column-scrambling; surfaced the false-precision bug (see above) |
+| Two recipes on one page | Surfaced and fixed the multi-recipe crash (see above); after fix, correctly extracts only the first recipe |
+| Image with only steps, no ingredients list | Ingredient cross-checking (originally built for YouTube) correctly rebuilt a full 11-item ingredients list from step text alone |
+| Non-English recipe image (French, real handwriting) | Fully accurate transcription and translation; correctly preserved the dish's proper name untranslated |
+| Low-contrast/faded printed page | Strong overall; one likely fabricated sentence-completion on a physically obscured/cut-off phrase (see limitations) |
+| Completely unrelated (non-recipe) photo | Correctly returned all-empty result, no fabrication |
+
+### Known limitations documented (not fixed — judged as inherent model behavior, not fixable via prompting)
+
+- **Single stylized-word misreads**: uncommon or decoratively-written words can occasionally be misread as a different plausible word (e.g. "pepperoni" → "pomegranate" in one test, → a garbled non-word → "pineapple" in another; "jumbo" initially misread as "kinda" in an earlier test before manual confirmation). Recurred across multiple unrelated images with different wrong substitutions each time — treated as a genuine, inherent vision-model limitation rather than a fixable prompt issue.
+- **Obscured/cut-off phrase completion**: when part of a sentence is physically illegible or cut off (as opposed to illegible-but-present), the model can complete it with a plausible-sounding invented ending rather than truncating or flagging uncertainty (e.g. "Bake for 30-35 mins" completed with an unverifiable "or until golden" where the source was obscured at that exact point). Judged as a harder, fuzzier problem than the false-precision fix, and not solved.
+- These two limitations are structurally different from earlier-fixed bugs: both produce text that remains grammatically coherent, so neither the blur check nor the coherence check can catch them. This is an honest, acknowledged gap in the current safety net.
+
+### Status after this round
+All 12 planned image test types completed. Two real bugs found and fixed. Two narrower limitations identified, tested for reproducibility (recurred across multiple images), and documented rather than chased further, given diminishing returns relative to time invested. Image extraction is considered solid and well-tested for the write-up's evaluation section.
+
+**Next:** PDF testing (currently still using Tesseract-based OCR, not yet re-tested since the vision-model switch for images).
