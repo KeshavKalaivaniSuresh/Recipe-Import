@@ -66,6 +66,18 @@ If the text is not a recipe at all (no ingredients or cooking instructions),
 return every field as null or an empty list — do not treat unrelated sentences as steps.
 Reply with ONLY the JSON, nothing else, no markdown formatting.
 
+If the source text contains the marker [unclear], treat that specific word or value as
+unknown — do not guess what it might be. Set the corresponding field to null and add a note
+like "illegible in source" if relevant.
+
+Do not replace vague, qualitative descriptions in the source (such as "a small amount",
+"a pinch", "a small border", "some") with an invented specific number or measurement.
+Keep the original vague wording as the note or value if no exact figure is given.
+
+If the source text contains more than one distinct, complete recipe, only extract the first
+recipe and ignore the rest. Always return a single JSON object, never a list or array of
+multiple recipes.
+
 
 Recipe text:
 {messy_text}"""
@@ -82,6 +94,15 @@ Recipe text:
             raw_text = raw_text.replace("json", "", 1).strip()
 
         recipe_dict = json.loads(raw_text)
+
+        if isinstance(recipe_dict, list):
+            return {
+                "name": None, "servings": None,
+                "prep_time_minutes": None, "cook_time_minutes": None,
+                "ingredients": [], "steps": [],
+                "error": "This source appears to contain multiple recipes. Please provide "
+                         "an image or text with only one recipe."
+            }
 
         if truncated:
             existing_note = recipe_dict.get("note", "") or ""
