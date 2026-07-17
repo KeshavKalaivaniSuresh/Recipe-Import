@@ -1,15 +1,13 @@
 import os
 import base64
-import pytesseract
 from groq import Groq
-from PIL import Image, ImageOps
+from PIL import Image
 from pdf2image import convert_from_path
 from extractor import extract_recipe, client as text_client
 import cv2
 import numpy as np
+import tempfile
 
-# Windows-specific: tell pytesseract exactly where tesseract.exe is (still used for PDFs)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 vision_client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
@@ -61,6 +59,11 @@ reply with ONLY the final transcribed text, nothing else."""
             reasoning_format="hidden",
         )
         raw_output = response.choices[0].message.content
+        finish_reason = response.choices[0].finish_reason
+
+        if finish_reason == "length":
+            print("Vision response was cut off due to length — content may be incomplete.")
+            return None
 
         # Strip any internal reasoning block the model may include
         if "<think>" in raw_output:
@@ -98,6 +101,8 @@ Text to judge:
         response = text_client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=8192,
+            reasoning_effort="none",
         )
         verdict = response.choices[0].message.content.strip().upper()
         return "GIBBERISH" not in verdict
@@ -106,29 +111,22 @@ Text to judge:
         return True  # if the check itself fails, don't block a possibly-good result
 
 
-def preprocess_image(image):
-    """Improve image quality for better OCR accuracy (used for PDFs)."""
-    image = image.convert("L")
-    width, height = image.size
-    image = image.resize((width * 4, height * 4), Image.LANCZOS)
-    image = ImageOps.autocontrast(image)
-    image = image.point(lambda x: 0 if x < 150 else 255, mode="1")
-    return image
-
-
 def extract_text_from_pdf(pdf_path):
-    """Convert each PDF page to an image, then run OCR on each page."""
+    """Convert each PDF page to an image, then use the vision model to read each page."""
     try:
         pages = convert_from_path(pdf_path)
     except Exception:
         return None
 
     full_text = ""
-    for page_image in pages:
-        page_image = preprocess_image(page_image)
-        page_text = pytesseract.image_to_string(page_image, config="--psm 6")
-        full_text += page_text + "\n"
-    return full_text
+    for i, page_image in enumerate(pages):
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            page_image.save(tmp.name, "PNG")
+            page_text = extract_recipe_from_image_vision(tmp.name)
+            if page_text:
+                full_text += page_text + "\n"
+
+    return full_text if full_text.strip() else None
 
 
 def fetch_recipe_from_file(file_path):
@@ -148,6 +146,32 @@ def fetch_recipe_from_file(file_path):
             }
         raw_text = extract_recipe_from_image_vision(file_path)
     elif lower_path.endswith(".pdf"):
+        try:
+            pages = convert_from_path(file_path)
+            if len(pages) > 3:
+                return {
+                    "name": None, "servings": None,
+                    "prep_time_minutes": None, "cook_time_minutes": None,
+                    "ingredients": [], "steps": [],
+                    "error": (
+                        "This PDF is too long or detailed to process reliably. To fix this:\n"
+                        "1. Upload a shorter recipe (3 pages or fewer)\n"
+                        "2. Remove any extra pages that aren't part of the recipe itself "
+                        "(e.g. photos, notes, or ads)\n"
+                        "3. Or copy the recipe text and paste it in directly instead of "
+                        "uploading the file"
+                    )
+                }
+        except Exception as e:
+            error_text = str(e).lower()
+            if "password" in error_text or "encrypt" in error_text:
+                return {
+                    "name": None, "servings": None,
+                    "prep_time_minutes": None, "cook_time_minutes": None,
+                    "ingredients": [], "steps": [],
+                    "error": "This PDF is password-protected. Please remove the password "
+                             "and upload it again, or paste the recipe text instead."
+                }
         raw_text = extract_text_from_pdf(file_path)
     else:
         return {
@@ -178,8 +202,8 @@ def fetch_recipe_from_file(file_path):
             "name": None, "servings": None,
             "prep_time_minutes": None, "cook_time_minutes": None,
             "ingredients": [], "steps": [],
-            "error": "This image is too unclear to read reliably (handwriting, blur, or poor "
-                     "image quality). Please try a clearer photo, or enter the recipe manually."
+            "error": "This file is too unclear to read reliably (handwriting, blur, or poor "
+                     "file quality). Please try a clearer file, or enter the recipe manually."
         }
 
     print("----- RAW EXTRACTED TEXT -----")
@@ -191,7 +215,7 @@ def fetch_recipe_from_file(file_path):
 
 
 if __name__ == "__main__":
-    test_file = "bad_multi-layout_image_test.png"
+    test_file = "fake_test.pdf"
     result = fetch_recipe_from_file(test_file)
 
     if result.get("error"):

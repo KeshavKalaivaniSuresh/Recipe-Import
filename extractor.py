@@ -89,6 +89,17 @@ Recipe text:
         )
         raw_text = response.choices[0].message.content.strip()
 
+        finish_reason = response.choices[0].finish_reason
+
+        if finish_reason == "length":
+            return {
+                "name": None, "servings": None,
+                "prep_time_minutes": None, "cook_time_minutes": None,
+                "ingredients": [], "steps": [],
+                "error": "This recipe is too large/detailed to process fully. Please try a "
+                         "shorter recipe, or simplify the source before uploading."
+            }
+
         if raw_text.startswith("```"):
             raw_text = raw_text.strip("`")
             raw_text = raw_text.replace("json", "", 1).strip()
