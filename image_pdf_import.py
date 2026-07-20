@@ -215,7 +215,7 @@ def fetch_recipe_from_file(file_path):
 
 
 if __name__ == "__main__":
-    test_file = "PDF_Tests/high_embedded-pixeled_pdf_test.pdf"
+    test_file = "Pdf_Tests/Merged_recipe_pdf_test.pdf"
     result = fetch_recipe_from_file(test_file)
 
     if result.get("error"):

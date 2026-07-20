@@ -73,7 +73,7 @@ python image_pdf_import.py   # test image/PDF extraction against a sample file
 
 ## What's Done
 
-- **Pasted text**: full extraction pipeline, tested against messy/incomplete input, non-recipe input, ranges/fractions, regional ingredient names, non-English text, and very long text (with safe truncation).
+- * *Pasted text**: full extraction pipeline, tested against messy/incomplete input, non-recipe input, ranges/fractions, regional ingredient names, non-English text, and very long text (with safe truncation).
 - **Webpages**: scraping via `recipe-scrapers`, with graceful handling of blocked sites (403), missing pages (404), paywalls, timeouts, multi-recipe collection pages, and messy personal-blog layouts.
 - **YouTube**: combines title, description, and transcript; filters conversational filler from transcripts; cross-checks ingredients mentioned only in steps; handles missing captions, non-English audio (with auto-translation), private/unavailable videos, and invalid URLs.
 - **Images**: uses a vision AI model to read recipe images directly, correctly handling fraction quantities (an area where traditional OCR failed).

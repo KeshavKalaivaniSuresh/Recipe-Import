@@ -101,7 +101,7 @@ def fetch_recipe_from_youtube(url):
 
 if __name__ == "__main__":
     test_urls = [
-        "https://www.youtube.com/watch?v=xxxxxxxxxxx",  # fake video ID, doesn't exist
+        "https://www.youtube.com/watch?v=tY9pSkn1VCg&t=1s",  # fake video ID, doesn't exist
     ]
 
     for url in test_urls:
