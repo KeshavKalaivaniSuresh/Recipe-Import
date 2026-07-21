@@ -7,6 +7,9 @@ from extractor import extract_recipe, client as text_client
 import cv2
 import numpy as np
 import tempfile
+import mimetypes
+import pillow_heif
+pillow_heif.register_heif_opener()
 
 
 vision_client = Groq(api_key=os.environ["GROQ_API_KEY"])
@@ -27,12 +30,29 @@ def is_image_too_blurry(image_path, threshold=50):
 def image_to_base64(image_path):
     with open(image_path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
+    
+
+def get_mime_type(image_path):
+    mime_type, _ = mimetypes.guess_type(image_path)
+    return mime_type or "image/png"  # sensible fallback if detection fails
+
+
+def convert_heic_to_jpeg(heic_path):
+    """Convert a HEIC/HEIF image to a temporary JPEG the vision API can read."""
+    try:
+        image = Image.open(heic_path)
+        tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        image.convert("RGB").save(tmp.name, "JPEG")
+        return tmp.name
+    except Exception:
+        return None
 
 
 def extract_recipe_from_image_vision(image_path):
     """Use a vision-capable AI model to directly read a recipe image."""
     try:
         base64_image = image_to_base64(image_path)
+        mime_type = get_mime_type(image_path)
 
         prompt = """Look at this image of a recipe and extract all the visible text related to
 the recipe: the dish name, servings, prep/cook time, every ingredient with its exact quantity
@@ -111,13 +131,8 @@ Text to judge:
         return True  # if the check itself fails, don't block a possibly-good result
 
 
-def extract_text_from_pdf(pdf_path):
-    """Convert each PDF page to an image, then use the vision model to read each page."""
-    try:
-        pages = convert_from_path(pdf_path)
-    except Exception:
-        return None
-
+def extract_text_from_pdf(pages):
+    """Take already-converted PDF page images and use the vision model to read each page."""
     full_text = ""
     for i, page_image in enumerate(pages):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
@@ -136,7 +151,18 @@ def fetch_recipe_from_file(file_path):
     """
     lower_path = file_path.lower()
 
-    if lower_path.endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp")):
+    if lower_path.endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp", ".heic", ".heif")):
+        if lower_path.endswith((".heic", ".heif")):
+            converted_path = convert_heic_to_jpeg(file_path)
+            if converted_path is None:
+                return {
+                    "name": None, "servings": None,
+                    "prep_time_minutes": None, "cook_time_minutes": None,
+                    "ingredients": [], "steps": [],
+                    "error": "Could not read this HEIC file. It may be corrupted or unsupported."
+                }
+            file_path = converted_path
+
         if is_image_too_blurry(file_path):
             return {
                 "name": None, "servings": None,
@@ -172,13 +198,19 @@ def fetch_recipe_from_file(file_path):
                     "error": "This PDF is password-protected. Please remove the password "
                              "and upload it again, or paste the recipe text instead."
                 }
-        raw_text = extract_text_from_pdf(file_path)
+            return {
+                "name": None, "servings": None,
+                "prep_time_minutes": None, "cook_time_minutes": None,
+                "ingredients": [], "steps": [],
+                "error": "Could not read this file. It may be corrupted or unsupported."
+            }
+        raw_text = extract_text_from_pdf(pages)
     else:
         return {
             "name": None, "servings": None,
             "prep_time_minutes": None, "cook_time_minutes": None,
             "ingredients": [], "steps": [],
-            "error": "Unsupported file type. Please upload an image (PNG/JPG) or PDF."
+            "error": "Unsupported file type. Please upload an image (PNG/JPG/WEBP/BMP/HEIC) or PDF."
         }
 
     if raw_text is None:
@@ -215,7 +247,7 @@ def fetch_recipe_from_file(file_path):
 
 
 if __name__ == "__main__":
-    test_file = "Pdf_Tests/Merged_recipe_pdf_test.pdf"
+    test_file = "Image_Tests/heic_image_test.heic"
     result = fetch_recipe_from_file(test_file)
 
     if result.get("error"):
