@@ -650,3 +650,43 @@ After the initial vision-model architecture fix, a full round of image edge-case
 All 12 planned image test types completed. Two real bugs found and fixed. Two narrower limitations identified, tested for reproducibility (recurred across multiple images), and documented rather than chased further, given diminishing returns relative to time invested. Image extraction is considered solid and well-tested for the write-up's evaluation section.
 
 **Next:** PDF testing (currently still using Tesseract-based OCR, not yet re-tested since the vision-model switch for images).
+
+## Update — PDF Vision-Model Switch + Full PDF Testing Round
+
+### Architecture change
+PDF extraction was switched from Tesseract OCR to the same vision-model approach used for images. Each PDF page is now converted to a temporary image and passed through `extract_recipe_from_image_vision` (the same function images use), then all pages' text is joined before the final `extract_recipe()` call. Tesseract, Poppler-based preprocessing, and all related imports were fully removed from the PDF path — Poppler is still required only for the initial page-to-image conversion (`convert_from_path`).
+
+### Bugs found and fixed during this round
+
+1. **Silent content truncation (vision step)** — dense PDF pages caused the vision model's response to be cut off mid-content by the token limit, silently dropping entire sections (e.g. all cooking steps missing with no error shown). Fixed by checking the API's `finish_reason` field directly for `"length"` and treating it as a clear failure, rather than relying on `<think>` tag detection (which doesn't fire when reasoning is disabled).
+2. **JSON parse crash on longer recipes (text extraction step)** — `extract_recipe()`'s own API call had no `reasoning_effort` setting and a low `max_tokens`, causing it to either return empty or truncated JSON on detailed recipes, crashing with `json.loads` errors. Fixed with `reasoning_effort="none"` and `max_tokens=8192`, plus the same `finish_reason == "length"` check, now returning a clear "recipe too large/detailed" error instead of crashing.
+3. **Crash on multi-recipe sources (found via image testing, applies to PDFs/text too)** — a source containing two full recipes caused the model to return a JSON list instead of a single object, crashing the caller. Fixed with an explicit "only extract the first recipe" prompt instruction plus a defensive `isinstance(recipe_dict, list)` check that returns a clear error instead of crashing even if the instruction is ignored.
+
+### New safety features added
+- **PDF page-count limit**: PDFs over 3 pages are rejected upfront (before any API calls), with a clear, numbered explanation for the user (shorten the recipe, remove extra pages, or paste text instead).
+- **Password-protected PDF detection**: `convert_from_path` failures are inspected for "password"/"encrypt" keywords and given a specific, actionable error message instead of the generic "could not read" fallback.
+- Generic error messages updated from "image" to "file" wording where they apply to both images and PDFs (e.g. the coherence-check failure message).
+
+### Full PDF test round completed
+| Test type | Result |
+|---|---|
+| Normal-sized recipe PDF (Grilled Cheese Sandwich) | Fully accurate |
+| Dense/long recipe PDF (Mutton Biryani, 24+ ingredients, 6 detailed steps) | Correctly rejected via `finish_reason` check once page-count alone didn't catch it (single page, but content-dense) |
+| Password-protected PDF | Correctly detected and given a specific, actionable message |
+| Corrupted/invalid PDF (real text file renamed to `.pdf`) | Correctly rejected with a clear error; verified via debug print that the correct file path was being read |
+| Merged content: recipe + unrelated article text | Correctly extracted only the actual recipe, ignored background/history text |
+| Merged content: two full, separate recipes | Correctly extracted only the first recipe, cleanly ignored the second (harder version of the same test) |
+| Scanned (image-only) PDF | Behaves identically to a digital-native PDF, as expected, since both are converted to images regardless |
+| Rotated pages (90°, 180°) | Both handled well; same occasional single-value misread pattern seen elsewhere in testing (not rotation-specific) |
+| Large embedded images, few pages (6000×8000px images) | First attempt used images with no text at all (couldn't confirm accuracy under load, only crash-safety); second attempt with real recipe text embedded confirmed accuracy holds up even with very large embedded images — some slowdown observed but no failure |
+
+### Real-world token/rate-limit numbers (for reference)
+Groq free-tier limits for `openai/gpt-oss-120b`: ~8,000 tokens/minute, ~200,000 tokens/day. This is why `max_tokens` is capped at a reasonable level (8192) rather than set arbitrarily high — a single oversized request could consume most or all of the per-minute budget, blocking further requests. The model's actual technical ceiling is far higher (~131K context, ~33K max output), so the practical constraint is the free-tier rate limit, not the model itself.
+
+### Open question raised, not yet resolved
+Whether to support additional file formats beyond the required PDF/image types (per the original problem statement, only these two are required). Considered: `.txt` (trivial to add, no logic changes needed), `.docx` (out of scope, meaningfully more work), and `.heic` (iPhone's default photo format — not currently in the accepted extension list, and a realistic gap since many real users would upload iPhone photos directly). Decision pending.
+
+### Status after this round
+PDF extraction now fully upgraded to the vision-model architecture, with comprehensive testing across 9 distinct real-world conditions (page limits, password protection, corruption, merged/multi-recipe content, scanned vs. digital-native, rotation, large file size). Three real bugs found and fixed with proper root-cause diagnosis (via `finish_reason`) rather than guesswork. This closes out PDF testing to the same standard of rigor as the image testing round.
+
+**Next steps:** decide on `.heic`/additional format support, then move to wrap-up work — formal evaluation set (5–10 saved sample imports across all sources), 1–2 page write-up, demo recording, and wiring into the HTML form once received from supervisor.
