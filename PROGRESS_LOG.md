@@ -690,3 +690,16 @@ Whether to support additional file formats beyond the required PDF/image types (
 PDF extraction now fully upgraded to the vision-model architecture, with comprehensive testing across 9 distinct real-world conditions (page limits, password protection, corruption, merged/multi-recipe content, scanned vs. digital-native, rotation, large file size). Three real bugs found and fixed with proper root-cause diagnosis (via `finish_reason`) rather than guesswork. This closes out PDF testing to the same standard of rigor as the image testing round.
 
 **Next steps:** decide on `.heic`/additional format support, then move to wrap-up work — formal evaluation set (5–10 saved sample imports across all sources), 1–2 page write-up, demo recording, and wiring into the HTML form once received from supervisor.
+
+## Update — Mime Type Fix, PDF Cleanup, HEIC Support, and Reasoning Token Fix
+
+### Bugs found and fixed
+1. **Incorrect mime type on image uploads** — `extract_recipe_from_image_vision` always labeled every uploaded image as `image/png` regardless of actual file type. Fixed using Python's built-in `mimetypes` module to detect and send the correct type (JPEG, WEBP, BMP, etc.) with no file conversion needed.
+2. **Duplicate PDF conversion** — `fetch_recipe_from_file` was converting the same PDF to images twice, once to check page count and once inside `extract_text_from_pdf`. Refactored so the page list from the first conversion is reused instead of converting again.
+3. **False "recipe too large" errors on normal videos/text** — a previously working YouTube video started failing with a "too large/detailed to process" error. Root cause: `extract_recipe()`'s API call had no `reasoning_effort` or `reasoning_format` setting, so the model's hidden reasoning tokens were silently consuming the response budget meant for the actual JSON output. Fixed by adding `max_tokens=8192`, `reasoning_effort="none"`, and `reasoning_format="hidden"` to match the settings already proven on the image vision call. Retesting in progress to confirm the fix.
+
+### New feature added
+- **HEIC/HEIF image support** — added `pillow-heif` dependency and a conversion helper that turns HEIC/HEIF files (the default iPhone photo format) into a temporary JPEG before running the existing blur check and vision extraction. Tested end to end on a real recipe photo, confirming correct ingredient and quantity extraction and correct handling of a recipe with no steps (returned an empty list rather than inventing steps).
+
+### Status after this round
+Image and PDF pipelines both confirmed stable across format edge cases. The reasoning-token fix addresses a bug affecting all sources that use the core extractor (text, webpage, YouTube), not just images/PDFs, so it needs a fresh full retest across sources before being marked fully resolved.

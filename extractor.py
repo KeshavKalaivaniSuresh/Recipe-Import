@@ -31,7 +31,7 @@ IMPORTANT: If the source text is written in a language other than English, you M
 the recipe name, ingredient names, notes, and steps into English in your JSON output.
 Do not leave any field in the original non-English script. However, keep well-known
 regional ingredient or dish names in their commonly used English form (e.g. "jeera",
-"paneer", "dal") rather than a literal translation, if that is how they are normally
+"paneer", "dal", "atta") rather than a literal translation, if that is how they are normally
 referred to in English.
 
 If a quantity contains clearly garbled, nonsensical, or mixed-up characters (such as random
@@ -40,12 +40,28 @@ scanned image), do NOT guess a plausible-looking number — instead, set quantit
 add a short note like "quantity unclear in source". However, standard fraction symbols (½, ⅓,
 ¼, ⅔, ¾, etc.) are always valid and should be confidently converted to their decimal or
 fractional value — do not treat these as unclear.
+
+For quantity values, always use a number (integer or decimal), never a text string — for
+example, output 0.25 instead of "1/4", and 8 instead of "8".
+
+If the same ingredient is used in more than one part of the recipe (such as separate marinade
+and sauce components) with different amounts, keep each use as its own separate ingredient
+entry with its own quantity, unit, and a note describing which part it's for. Do not merge
+these into a single entry or combine the amounts into the note text.
+
 If a quantity is written as a range (e.g. "4-5", "3-4", "1-2"), preserve the full range exactly
 as written in the quantity field (e.g. "4-5") — do not collapse it to just one of the numbers.
 
 If there are no method/steps in the source at all, return an empty list for steps.
 Do NOT invent a placeholder sentence such as "no steps provided" — an empty list is correct
 and expected in this situation.
+
+This same rule applies if the source text is cut off partway through, such as in the middle
+of a recipe's steps. If the source ends before the recipe is complete, simply stop the step
+list at the last instruction that was actually present in the source. Do NOT add a commentary
+sentence noting that steps are missing, incomplete, or were not provided — this is exactly
+the same kind of invented content as a placeholder, just appearing mid-list instead of as the
+whole list.
 
 Include every instruction from the source as a separate step, in the same order,
 even short ones like "done" or "serve". Do not skip, merge, or summarize steps.
@@ -82,10 +98,23 @@ multiple recipes.
 Recipe text:
 {messy_text}"""
 
+    # Groq's free tier caps this model at ~8000 tokens per minute (prompt + response
+    # combined). We estimate the prompt's token count and size the response budget
+    # to fit safely under that limit instead of using one fixed number for every call.
+    TPM_LIMIT = 8000
+    SAFETY_BUFFER = 200  # margin since this is an estimate, not an exact token count
+    estimated_prompt_tokens = len(prompt) // 4  # rough chars-to-tokens estimate
+
+    dynamic_max_tokens = TPM_LIMIT - estimated_prompt_tokens - SAFETY_BUFFER
+    dynamic_max_tokens = max(512, min(dynamic_max_tokens, 8192))
+
     try:
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=dynamic_max_tokens,
+            reasoning_effort="low",
+            reasoning_format="hidden",
         )
         raw_text = response.choices[0].message.content.strip()
 

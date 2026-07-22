@@ -91,3 +91,10 @@ python image_pdf_import.py   # test image/PDF extraction against a sample file
 ## Sample Results
 
 *(To be added: 5–10 example imports across all source types, saved for review.)*
+
+
+## Recent Updates
+- Added support for HEIC/HEIF image uploads (Apple's default photo format), converted internally to JPEG before processing.
+- Fixed image uploads being incorrectly labeled as PNG regardless of their actual file type.
+- Improved PDF processing performance by removing a redundant conversion step.
+- Fixed a bug where valid, normal-sized recipes could incorrectly return a "recipe too large" error due to a missing model configuration setting.
